@@ -82,12 +82,12 @@ class ImprovedGreedyMovePlayer(AbstractMovePlayer):
 class HELPER:
     def __init__(self):
         self.max_move = None
-        self.min_indicate=None
+        self.min_indicate = None
 
-    def RB_MINIMAX(self, board, agent:bool, D:int, value:int = 2):
+    def RB_MINIMAX(self, board, agent: bool, D: int, value: int = 2):
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
-        if goal or D==0:
+        if goal or D == 0:
             return self.heuristics(board, agent, score, goal, empty_squares)
         # MAX player
         if agent:
@@ -97,12 +97,12 @@ class HELPER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.RB_MINIMAX(new_board, False, D-1, value)
+                    v = self.RB_MINIMAX(new_board, False, D - 1, value)
                     if currMax < v:
                         currMax = v
                         self.max_move = move
             return currMax
-        else: # MIN player
+        else:  # MIN player
             # init the min
             currMin = float('inf')
             # save the place of the empty cells
@@ -111,10 +111,49 @@ class HELPER:
             for cell in cells:
                 new_board = list(board)
                 new_board[cell] = value
-                v = self.RB_MINIMAX(new_board, True, D-1, value)
+                v = self.RB_MINIMAX(new_board, True, D - 1, value)
                 if currMin > v:
-                    v = currMin
+                    currMin = v
                     self.min_indicate = cell
+            return currMin
+
+    def AlphaBeta(self, board, agent: bool, D: int, Alpha, Beta, value: int = 2):
+        # check if we reach a goal
+        goal, score, empty_squares = self.isGoal(board, agent)
+        if goal or D == 0:
+            return self.heuristics(board, agent, score, goal, empty_squares)
+        # MAX player
+        if agent:
+            # init max
+            currMax = float('-inf')
+            # loop over the children to find the max
+            for move in Move:
+                new_board, done, score = commands[move](board)
+                if done:
+                    v = self.AlphaBeta(new_board, False, D - 1, Alpha, Beta)
+                    if currMax < v:
+                        currMax = v
+                        self.max_move = move
+                    Alpha = max(Alpha, currMax)
+                    if currMax >= Beta:
+                        return float("inf")
+            return currMax
+        else:  # MIN player
+            # init the min
+            currMin = float('inf')
+            # save the place of the empty cells
+            cells = [i for i, x in enumerate(board) if x == 0]
+            # loop over the empty places
+            for cell in cells:
+                new_board = list(board)
+                new_board[cell] = value
+                v = self.AlphaBeta(new_board, True, D - 1, Alpha, Beta)
+                if currMin > v:
+                    currMin = v
+                    self.min_indicate = cell
+                Beta = min(currMin, Beta)
+                if currMin <= Alpha:
+                    return float("-inf")
             return currMin
 
     def countEmptySquares(self, board):
@@ -125,7 +164,7 @@ class HELPER:
                     counter += 1
         return counter
 
-    def heuristics(self, board, agent, score, goal, empty_squares, weight = 0.6):
+    def heuristics(self, board, agent, score, goal, empty_squares, weight=0.6):
         if goal:
             return score
         return weight * score + empty_squares * (1 - weight)
@@ -166,14 +205,14 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
         # save the time
         init_time = time.time()
         # init depth
-        D=1
+        D = 1
         # init move
         move = None
         while time.time() - init_time <= time_limit:
             v = self.helper_fun.RB_MINIMAX(board, True, D)
             if time.time() - init_time <= time_limit:
                 move = self.helper_fun.max_move
-            D = D+1
+            D = D + 1
         return move
 
 
@@ -213,13 +252,21 @@ class ABMovePlayer(AbstractMovePlayer):
 
     def __init__(self):
         AbstractMovePlayer.__init__(self)
-        # TODO: add here if needed
+        self.helper_fun = HELPER()
 
     def get_move(self, board, time_limit) -> Move:
-        # TODO: erase the following line and implement this function.
-        raise NotImplementedError
-
-    # TODO: add here helper functions in class, if needed
+        # save the time
+        init_time = time.time()
+        # init depth
+        D = 1
+        # init move
+        move = None
+        while time.time() - init_time <= time_limit:
+            v = self.helper_fun.AlphaBeta(board, True, D, float("-inf"), float("inf"))
+            if time.time() - init_time <= time_limit:
+                move = self.helper_fun.max_move
+            D = D + 1
+        return move
 
 
 # part D
