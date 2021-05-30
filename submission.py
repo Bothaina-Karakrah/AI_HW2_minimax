@@ -101,8 +101,7 @@ class HELPER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.RB_MINIMAX(new_board, MIN_PLAYER, D - 1)
-                    currMax = max(currMax, v)
+                    currMax = max(currMax, self.RB_MINIMAX(new_board, MIN_PLAYER, D - 1))
             return currMax
         else:  # MIN player
             # init the min
@@ -114,8 +113,7 @@ class HELPER:
             for (i, j) in cells:
                 new_board = board.copy()
                 new_board[i][j] = value
-                v = self.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value)
-                currMin = min(currMin, v)
+                currMin = min(currMin, self.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value))
             return currMin
 
     def AlphaBeta(self, board, agent: int, D: int, Alpha, Beta, value: int = 2):
@@ -131,10 +129,7 @@ class HELPER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta)
-                    if currMax < v:
-                        currMax = v
-                        self.max_move = move
+                    currMax = max(currMax, self.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta))
                     Alpha = max(Alpha, currMax)
                     if currMax >= Beta:
                         return float("inf")
@@ -147,12 +142,9 @@ class HELPER:
                      item == 0]
             # loop over the empty places
             for (i, j) in cells:
-                new_board = list(board)
+                new_board = board.copy()
                 new_board[i][j] = value
-                v = self.AlphaBeta(new_board, MAX_PLAYER, D - 1, Alpha, Beta)
-                if currMin > v:
-                    currMin = v
-                    self.best_indicate = (i, j)
+                currMin = min(currMin, self.AlphaBeta(new_board, MAX_PLAYER, D - 1, Alpha, Beta, value))
                 Beta = min(currMin, Beta)
                 if currMin <= Alpha:
                     return float("-inf")
@@ -175,9 +167,7 @@ class HELPER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.RB_Expectimax(new_board, CHANCE_PLAYER, D - 1, value)
-                    if currMax < v:
-                        currMax = v
+                    currMax = max(currMax, self.RB_Expectimax(new_board, MIN_PLAYER, D - 1))
             return currMax
         else:  # MIN player
             # init the min
@@ -187,11 +177,9 @@ class HELPER:
                      item == 0]
             # loop over the empty places
             for (i, j) in cells:
-                new_board = list(board)
+                new_board = board.copy()
                 new_board[i][j] = value
-                v = self.RB_Expectimax(new_board, MAX_PLAYER, D - 1, value)
-                if currMin > v:
-                    currMin = v
+                currMin = min(currMin, self.RB_Expectimax(new_board, MAX_PLAYER, D - 1, value))
             return currMin
 
     def countEmptySquares(self, board):
@@ -246,14 +234,12 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
         D = 1
         # init move
         move = None
-        #while time.time() - init_time <= time_limit:
-        #    currres = self.play(board, D)
-        #    if time.time() - init_time <= time_limit:
-        #        move = currres
-        #    D += 1
-        move = self.play(board, 5)
-        if move is None:
-            exit(7)
+        while True:
+            move = self.play(board, D)
+            print(move, D)
+            if time.time() - init_time >= time_limit:
+                break
+            D += 1
         return move
 
     def play(self, board, D):
@@ -289,12 +275,12 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
         D = 1
         # init move
         inidcate = None
-        #while time.time() - init_time <= time_limit:
-        #    currres = self.play(board, D)
-        #    if time.time() - init_time <= time_limit:
-        #        inidcate = currres
-        #    D += 1
-        inidcate = self.play(board, 5)
+        while True:
+            res = self.play(board, D)
+            if time.time() - init_time >= time_limit:
+                break
+            inidcate = res
+            D += 1
         if inidcate is None:
             exit(1)
         return inidcate
@@ -371,6 +357,19 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
             exit(1)
         return move
 
+    def play(self, board, D):
+        currMax = float('-inf')
+        bestMove = None
+        # loop over the children to find the max
+        for move in Move:
+            new_board, done, score = commands[move](board)
+            if done:
+                v = self.helper_fun.RB_MINIMAX(new_board, MIN_PLAYER, D - 1)
+                if currMax < v:
+                    currMax = v
+                    bestMove = move
+        return bestMove
+
 
 class ExpectimaxIndexPlayer(AbstractIndexPlayer):
     """Expectimax Index Player
@@ -397,6 +396,22 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
         if inidcate is None:
             exit(1)
         return inidcate
+
+    def play(self, board, D, value=2):
+        currMin = float('inf')
+        bestIndicate = None
+        # save the place of the empty cells
+        cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
+                 item == 0]
+        # loop over the empty places
+        for (i, j) in cells:
+            new_board = board.copy()
+            new_board[i][j] = value
+            v = self.helper_fun.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value)
+            if currMin > v:
+                currMin = v
+                bestIndicate = (i, j)
+        return bestIndicate
 
 
 # Tournament

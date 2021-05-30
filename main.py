@@ -31,7 +31,7 @@ if __name__ == "__main__":
                         help='The type of the second player(Index Player).',
                         choices=index_players.keys())
 
-    parser.add_argument('-move_time', default=10, type=float,
+    parser.add_argument('-move_time', default=1.0, type=float,
                         help='Time (sec) for each turn.')
 
     args = parser.parse_args()
