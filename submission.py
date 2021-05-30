@@ -2,6 +2,11 @@ import logic
 import random
 from AbstractPlayers import *
 import time
+MAX_PLAYER = 1
+MIN_PLAYER = 2
+CHANCE_PLAYER = 3
+P2 = 0.9
+P4 = 0.1
 
 # commands to use for move players. dictionary : Move(enum) -> function(board),
 # all the functions {up,down,left,right) receive board as parameter and return tuple of (new_board, done, score).
@@ -60,7 +65,7 @@ class ImprovedGreedyMovePlayer(AbstractMovePlayer):
         self.helper = HELPER()
 
     def get_move(self, board, time_limit) -> Move:
-        weight = 0.9  ## TODO: Change the weight
+        weight = 0.8  ## TODO: Change the weight
 
         # save the heuristics values for the next step
         optional_moves_score = {}
@@ -73,7 +78,6 @@ class ImprovedGreedyMovePlayer(AbstractMovePlayer):
         return max(optional_moves_score, key=optional_moves_score.get)
 
     # TODO: add here helper functions in class, if needed
-
     def heuristics(self, board, score, weight):
         empty_squares = self.helper.countEmptySquares(board)
         return weight * score + empty_squares * (1 - weight)
@@ -84,20 +88,20 @@ class HELPER:
         self.max_move = None
         self.min_indicate = None
 
-    def RB_MINIMAX(self, board, agent: bool, D: int, value: int = 2):
+    def RB_MINIMAX(self, board, agent: int, D: int, value: int = 2):
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
         if goal or D == 0:
-            return self.heuristics(board, agent, score, goal, empty_squares)
+            return self.heuristics(score, goal, empty_squares)
         # MAX player
-        if agent:
+        if agent == MAX_PLAYER:
             # init max
             currMax = float('-inf')
             # loop over the children to find the max
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.RB_MINIMAX(new_board, False, D - 1, value)
+                    v = self.RB_MINIMAX(new_board, MIN_PLAYER, D - 1, value)
                     if currMax < v:
                         currMax = v
                         self.max_move = move
@@ -111,26 +115,26 @@ class HELPER:
             for cell in cells:
                 new_board = list(board)
                 new_board[cell] = value
-                v = self.RB_MINIMAX(new_board, True, D - 1, value)
+                v = self.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value)
                 if currMin > v:
                     currMin = v
                     self.min_indicate = cell
             return currMin
 
-    def AlphaBeta(self, board, agent: bool, D: int, Alpha, Beta, value: int = 2):
+    def AlphaBeta(self, board, agent: int, D: int, Alpha, Beta, value: int = 2):
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
         if goal or D == 0:
-            return self.heuristics(board, agent, score, goal, empty_squares)
+            return self.heuristics(score, goal, empty_squares)
         # MAX player
-        if agent:
+        if agent == MAX_PLAYER:
             # init max
             currMax = float('-inf')
             # loop over the children to find the max
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    v = self.AlphaBeta(new_board, False, D - 1, Alpha, Beta)
+                    v = self.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta)
                     if currMax < v:
                         currMax = v
                         self.max_move = move
@@ -147,13 +151,49 @@ class HELPER:
             for cell in cells:
                 new_board = list(board)
                 new_board[cell] = value
-                v = self.AlphaBeta(new_board, True, D - 1, Alpha, Beta)
+                v = self.AlphaBeta(new_board, MAX_PLAYER, D - 1, Alpha, Beta)
                 if currMin > v:
                     currMin = v
                     self.min_indicate = cell
                 Beta = min(currMin, Beta)
                 if currMin <= Alpha:
                     return float("-inf")
+            return currMin
+
+    def RB_Expectimax(self, board, agent: int, D: int, value: int = 2):
+        # check if we reach a goal
+        goal, score, empty_squares = self.isGoal(board, agent)
+        if goal or D == 0:
+            return self.heuristics(score, goal, empty_squares)
+        if agent == CHANCE_PLAYER:
+            sum_chance = 0
+            sum_chance += (self.RB_Expectimax(board, MIN_PLAYER, D-1) * P2) + (self.RB_Expectimax(board, MIN_PLAYER, D-1, 4) * P4)
+            return sum_chance
+        if agent == MAX_PLAYER:
+            # init max
+            currMax = float('-inf')
+            # loop over the children to find the max
+            for move in Move:
+                new_board, done, score = commands[move](board)
+                if done:
+                    v = self.RB_Expectimax(new_board, CHANCE_PLAYER, D - 1, value)
+                    if currMax < v:
+                        currMax = v
+                        self.max_move = move
+            return currMax
+        else:  # MIN player
+            # init the min
+            currMin = float('inf')
+            # save the place of the empty cells
+            cells = [i for i, x in enumerate(board) if x == 0]
+            # loop over the empty places
+            for cell in cells:
+                new_board = list(board)
+                new_board[cell] = value
+                v = self.RB_Expectimax(new_board, MAX_PLAYER, D - 1, value)
+                if currMin > v:
+                    currMin = v
+                    self.min_indicate = cell
             return currMin
 
     def countEmptySquares(self, board):
@@ -164,15 +204,15 @@ class HELPER:
                     counter += 1
         return counter
 
-    def heuristics(self, board, agent, score, goal, empty_squares, weight=0.6):
+    def heuristics(self, score, goal, empty_squares, weight=0.6):
         if goal:
             return score
         return weight * score + empty_squares * (1 - weight)
 
-    def isGoal(self, board, player):
+    def isGoal(self, board, agent):
         goal = True
         emptyCells = self.countEmptySquares(board)
-        if player:
+        if agent == MAX_PLAYER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
@@ -209,10 +249,12 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
         # init move
         move = None
         while time.time() - init_time <= time_limit:
-            v = self.helper_fun.RB_MINIMAX(board, True, D)
+            v = self.helper_fun.RB_MINIMAX(board, MAX_PLAYER, D)
             if time.time() - init_time <= time_limit:
                 move = self.helper_fun.max_move
             D = D + 1
+        if move is None:
+            exit(1)
         return move
 
 
@@ -236,10 +278,12 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
         # init move
         inidcate = None
         while time.time() - init_time <= time_limit:
-            v = self.helper_fun.RB_MINIMAX(board, False, D)
+            v = self.helper_fun.RB_MINIMAX(board, MIN_PLAYER, D)
             if time.time() - init_time <= time_limit:
                 inidcate = self.helper_fun.min_indicate
             D = D + 1
+        if inidcate is None:
+            exit(1)
         return inidcate
 
 
@@ -262,10 +306,12 @@ class ABMovePlayer(AbstractMovePlayer):
         # init move
         move = None
         while time.time() - init_time <= time_limit:
-            v = self.helper_fun.AlphaBeta(board, True, D, float("-inf"), float("inf"))
+            v = self.helper_fun.AlphaBeta(board, MAX_PLAYER, D, float("-inf"), float("inf"))
             if time.time() - init_time <= time_limit:
                 move = self.helper_fun.max_move
             D = D + 1
+        if move is None:
+            exit(1)
         return move
 
 
@@ -278,13 +324,23 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
 
     def __init__(self):
         AbstractMovePlayer.__init__(self)
-        # TODO: add here if needed
+        self.helper_fun = HELPER()
 
     def get_move(self, board, time_limit) -> Move:
-        # TODO: erase the following line and implement this function.
-        raise NotImplementedError
-
-    # TODO: add here helper functions in class, if needed
+        # save the time
+        init_time = time.time()
+        # init depth
+        D = 1
+        # init move
+        move = None
+        while time.time() - init_time <= time_limit:
+            v = self.helper_fun.RB_Expectimax(board, MAX_PLAYER, D)
+            if time.time() - init_time <= time_limit:
+                move = self.helper_fun.max_move
+            D = D + 1
+        if move is None:
+            exit(1)
+        return move
 
 
 class ExpectimaxIndexPlayer(AbstractIndexPlayer):
@@ -295,13 +351,23 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
 
     def __init__(self):
         AbstractIndexPlayer.__init__(self)
-        # TODO: add here if needed
+        self.helper_fun = HELPER()
 
     def get_indices(self, board, value, time_limit) -> (int, int):
-        # TODO: erase the following line and implement this function.
-        raise NotImplementedError
-
-    # TODO: add here helper functions in class, if needed
+        # save the time
+        init_time = time.time()
+        # init depth
+        D = 1
+        # init move
+        inidcate = None
+        while time.time() - init_time <= time_limit:
+            v = self.helper_fun.RB_Expectimax(board, MIN_PLAYER, D)
+            if time.time() - init_time <= time_limit:
+                inidcate = self.helper_fun.min_indicate
+            D = D + 1
+        if inidcate is None:
+            exit(1)
+        return inidcate
 
 
 # Tournament
