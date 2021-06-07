@@ -8,6 +8,7 @@ MIN_PLAYER = 2
 CHANCE_PLAYER = 3
 P2 = 0.9
 P4 = 0.1
+MUL_TIME = 50
 
 # commands to use for move players. dictionary : Move(enum) -> function(board),
 # all the functions {up,down,left,right) receive board as parameter and return tuple of (new_board, done, score).
@@ -66,22 +67,19 @@ class ImprovedGreedyMovePlayer(AbstractMovePlayer):
         self.helper = HELPER()
 
     def get_move(self, board, time_limit) -> Move:
-        weight = 0.8  ## TODO: Change the weight
+        # weight = 0.8  ## TODO: Change the weight
 
         # save the heuristics values for the next step
         optional_moves_score = {}
         for move in Move:
             new_board, done, score = commands[move](board)
             if done:
-                optional_moves_score[move] = self.heuristics(new_board, score, weight)
+                optional_moves_score[move] = self.helper.heuristics(new_board, score)
 
-        # choose the max heuristics value
+        # choose the move of the max heuristic value
         return max(optional_moves_score, key=optional_moves_score.get)
 
     # TODO: add here helper functions in class, if needed
-    def heuristics(self, board, score, weight):
-        empty_squares = self.helper.countEmptySquares(board)
-        return weight * score + empty_squares * (1 - weight)
 
 
 class HELPER:
@@ -92,7 +90,7 @@ class HELPER:
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
         if goal or D == 0:
-            return self.heuristics(score, goal, empty_squares)
+            return self.heuristics(board, score)
         # MAX player
         if agent == MAX_PLAYER:
             # init max
@@ -120,7 +118,7 @@ class HELPER:
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
         if goal or D == 0:
-            return self.heuristics(score, goal, empty_squares)
+            return self.heuristics(board, score)
         # MAX player
         if agent == MAX_PLAYER:
             # init max
@@ -154,7 +152,7 @@ class HELPER:
         # check if we reach a goal
         goal, score, empty_squares = self.isGoal(board, agent)
         if goal or D == 0:
-            return self.heuristics(score, goal, empty_squares)
+            return self.heuristics(board, score)
         if agent == CHANCE_PLAYER:
             sum_chance = 0
             sum_chance += (self.RB_Expectimax(board, MIN_PLAYER, D - 1) * P2) + (
@@ -190,10 +188,63 @@ class HELPER:
                     counter += 1
         return counter
 
-    def heuristics(self, score, goal, empty_squares, weight=0.8):
-        if goal:
-            return score
-        return weight * score + empty_squares * (1 - weight)
+    def countArroundSquares(self, board):
+        counter = 0
+        for i in range(0, len(board)):
+            for j in range(0, len(board)):
+                if (i == 0 or j == 0 or i == len(board) - 1 or j == len(board) - 1) and board[i][j] > 0:
+                    counter += 1
+        return counter
+
+    def findMaxVal(self, board):
+        currMax = 0
+        for i in range(0, len(board)):
+            for j in range(0, len(board)):
+                if board[i][j] > currMax:
+                    currMax = board[i][j]
+        return currMax
+
+    def countEqualNear(self, board):
+        counter = 0
+        for i in range(0, len(board)):
+            for j in range(0, len(board)):
+                if i - 1 >= 0 and board[i - 1][j] == board[i][j]:
+                    counter += 1
+                if j - 1 >= 0 and board[i][j - 1] == board[i][j]:
+                    counter += 1
+                if i + 1 < len(board) and board[i + 1][j] == board[i][j]:
+                    counter += 1
+                if j + 1 < len(board) and board[i][j + 1] == board[i][j]:
+                    counter += 1
+        return counter
+
+    def isMonotonic(self, board):
+        numMonotonic = 0
+        mono = True
+        for i in range(0, len(board)):
+            rise = True
+            for j in range(0, len(board)-1):
+                if board[i][j] > board[i][j+1] and rise:
+                    continue
+                elif board[i][j] > board[i][j+1] and not rise:
+                    mono = False
+                    break
+                elif j == 0 and board[i][j] < board[i][j+1]:
+                    rise = False
+                elif board[i][j] < board[i][j+1] and not rise:
+                    continue
+            if mono:
+                numMonotonic += 1
+            mono = True
+        return numMonotonic
+
+    def heuristics(self, board, score):
+        empty_squares = self.countEmptySquares(board)
+        around_squares = self.countArroundSquares(board)
+        max_val = self.findMaxVal(board)
+        near = self.countEqualNear(board)
+        monotonic = self.isMonotonic(board)
+        return score * 50 + 150 * (empty_squares + around_squares) + 50 * max_val + 200 * near + 200 * monotonic
 
     def isGoal(self, board, agent):
         goal = True
@@ -234,7 +285,7 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
         move = self.play(board, D)
         itr_time = time.time() - started
         curr_time = itr_time
-        next_itr_time = itr_time * 16
+        next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
@@ -242,7 +293,7 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
-            next_itr_time = itr_time * 16
+            next_itr_time = itr_time * MUL_TIME
             curr_time = time.time() - started
         return move
 
@@ -279,7 +330,7 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
         indicate = self.play(board, D)
         itr_time = time.time() - started
         curr_time = itr_time
-        next_itr_time = itr_time * 16
+        next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
@@ -287,7 +338,7 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
             if curr_indicate is not None:
                 indicate = curr_indicate
             itr_time = time.time() - started_time
-            next_itr_time = itr_time * 16
+            next_itr_time = itr_time * MUL_TIME
             curr_time = time.time() - started
         return indicate
 
@@ -326,7 +377,7 @@ class ABMovePlayer(AbstractMovePlayer):
         move = self.play(board, D)
         itr_time = time.time() - started
         curr_time = itr_time
-        next_itr_time = itr_time * 16
+        next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
@@ -334,7 +385,7 @@ class ABMovePlayer(AbstractMovePlayer):
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
-            next_itr_time = itr_time * 16
+            next_itr_time = itr_time * MUL_TIME
             curr_time = time.time() - started
         return move
 
@@ -373,7 +424,7 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
         move = self.play(board, D)
         itr_time = time.time() - started
         curr_time = itr_time
-        next_itr_time = itr_time * 16
+        next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
@@ -381,7 +432,7 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
-            next_itr_time = itr_time * 16
+            next_itr_time = itr_time * MUL_TIME
             curr_time = time.time() - started
         return move
 
@@ -416,7 +467,7 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
         indicate = self.play(board, D)
         itr_time = time.time() - started
         curr_time = itr_time
-        next_itr_time = itr_time * 16
+        next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
@@ -424,7 +475,7 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
             if curr_indicate is not None:
                 indicate = curr_indicate
             itr_time = time.time() - started_time
-            next_itr_time = itr_time * 16
+            next_itr_time = itr_time * MUL_TIME
             curr_time = time.time() - started
         return indicate
 
