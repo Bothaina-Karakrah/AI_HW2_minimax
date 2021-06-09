@@ -8,7 +8,7 @@ MIN_PLAYER = 2
 CHANCE_PLAYER = 3
 P2 = 0.9
 P4 = 0.1
-MUL_TIME = 50
+MUL_TIME = 20
 
 # commands to use for move players. dictionary : Move(enum) -> function(board),
 # all the functions {up,down,left,right) receive board as parameter and return tuple of (new_board, done, score).
@@ -107,11 +107,12 @@ class HELPER:
             # save the place of the empty cells
             cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
                      item == 0]
+            new_board = board.copy()
             # loop over the empty places
             for (i, j) in cells:
-                new_board = board.copy()
                 new_board[i][j] = value
                 currMin = min(currMin, self.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value))
+                new_board[i][j] = 0
             return currMin
 
     def AlphaBeta(self, board, agent: int, D: int, Alpha, Beta, value: int = 2):
@@ -138,11 +139,12 @@ class HELPER:
             # save the place of the empty cells
             cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
                      item == 0]
+            new_board = board.copy()
             # loop over the empty places
             for (i, j) in cells:
-                new_board = board.copy()
                 new_board[i][j] = value
                 currMin = min(currMin, self.AlphaBeta(new_board, MAX_PLAYER, D - 1, Alpha, Beta, value))
+                new_board[i][j] = 0
                 Beta = min(currMin, Beta)
                 if currMin <= Alpha:
                     return float("-inf")
@@ -154,10 +156,7 @@ class HELPER:
         if goal or D == 0:
             return self.heuristics(board, score)
         if agent == CHANCE_PLAYER:
-            sum_chance = 0
-            sum_chance += (self.RB_Expectimax(board, MIN_PLAYER, D - 1) * P2) + (
-                    self.RB_Expectimax(board, MIN_PLAYER, D - 1, 4) * P4)
-            return sum_chance
+            return (self.RB_Expectimax(board, MIN_PLAYER, D - 1, 2) * P2) + (self.RB_Expectimax(board, MIN_PLAYER, D - 1, 4) * P4)
         if agent == MAX_PLAYER:
             # init max
             currMax = float('-inf')
@@ -165,7 +164,7 @@ class HELPER:
             for move in Move:
                 new_board, done, score = commands[move](board)
                 if done:
-                    currMax = max(currMax, self.RB_Expectimax(new_board, CHANCE_PLAYER, D - 1))
+                    currMax = max(currMax, self.RB_Expectimax(new_board, CHANCE_PLAYER, D - 1, value))
             return currMax
         else:  # MIN player
             # init the min
@@ -173,11 +172,12 @@ class HELPER:
             # save the place of the empty cells
             cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
                      item == 0]
+            new_board = board.copy()
             # loop over the empty places
             for (i, j) in cells:
-                new_board = board.copy()
                 new_board[i][j] = value
                 currMin = min(currMin, self.RB_Expectimax(new_board, MAX_PLAYER, D - 1, value))
+                new_board[i][j] = 0
             return currMin
 
     def countEmptySquares(self, board):
@@ -223,15 +223,15 @@ class HELPER:
         mono = True
         for i in range(0, len(board)):
             rise = True
-            for j in range(0, len(board)-1):
-                if board[i][j] > board[i][j+1] and rise:
+            for j in range(0, len(board) - 1):
+                if board[i][j] > board[i][j + 1] and rise:
                     continue
-                elif board[i][j] > board[i][j+1] and not rise:
+                elif board[i][j] > board[i][j + 1] and not rise:
                     mono = False
                     break
-                elif j == 0 and board[i][j] < board[i][j+1]:
+                elif j == 0 and board[i][j] < board[i][j + 1]:
                     rise = False
-                elif board[i][j] < board[i][j+1] and not rise:
+                elif board[i][j] < board[i][j + 1] and not rise:
                     continue
             if mono:
                 numMonotonic += 1
@@ -282,14 +282,14 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
         # init depth
         D = 1
         started = time.time()
-        move = self.play(board, D)
+        move = self.play(board, D, time_limit)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_move = self.play(board, D)
+            curr_move = self.play(board, D, next_itr_time)
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
@@ -297,7 +297,8 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
             curr_time = time.time() - started
         return move
 
-    def play(self, board, D):
+    def play(self, board, D, allowed_time):
+        started_time = time.time()
         currMax = float('-inf')
         bestMove = None
         # loop over the children to find the max
@@ -308,6 +309,8 @@ class MiniMaxMovePlayer(AbstractMovePlayer):
                 if currMax < v:
                     currMax = v
                     bestMove = move
+            if time.time() - started_time > allowed_time:
+                return None
         return bestMove
 
 
@@ -327,14 +330,14 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
         # init depth
         D = 1
         started = time.time()
-        indicate = self.play(board, D)
+        indicate = self.play(board, D, time_limit)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_indicate = self.play(board, D)
+            curr_indicate = self.play(board, D, next_itr_time)
             if curr_indicate is not None:
                 indicate = curr_indicate
             itr_time = time.time() - started_time
@@ -342,20 +345,25 @@ class MiniMaxIndexPlayer(AbstractIndexPlayer):
             curr_time = time.time() - started
         return indicate
 
-    def play(self, board, D, value=2):
+    def play(self, board, D, allowed_time, value=2):
+        started_time = time.time()
         currMin = float('inf')
         bestIndicate = None
         # save the place of the empty cells
         cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
                  item == 0]
+        new_board = board.copy()
         # loop over the empty places
         for (i, j) in cells:
-            new_board = board.copy()
+
             new_board[i][j] = value
             v = self.helper_fun.RB_MINIMAX(new_board, MAX_PLAYER, D - 1, value)
+            new_board[i][j] = 0
             if currMin > v:
                 currMin = v
                 bestIndicate = (i, j)
+            if time.time() - started_time > allowed_time:
+                return None
         return bestIndicate
 
 
@@ -374,14 +382,14 @@ class ABMovePlayer(AbstractMovePlayer):
         # init depth
         D = 1
         started = time.time()
-        move = self.play(board, D)
+        move = self.play(board, D, time_limit)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_move = self.play(board, D)
+            curr_move = self.play(board, D, next_itr_time)
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
@@ -389,7 +397,8 @@ class ABMovePlayer(AbstractMovePlayer):
             curr_time = time.time() - started
         return move
 
-    def play(self, board, D):
+    def play(self, board, D, allowed_time=None):
+        started_time = time.time()
         currMax = float('-inf')
         Alpha = float("-inf")
         Beta = float("inf")
@@ -399,10 +408,12 @@ class ABMovePlayer(AbstractMovePlayer):
             new_board, done, score = commands[move](board)
             if done:
                 v = self.helper_fun.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta)
-                if currMax < v:
+                if v > currMax:
                     currMax = v
                     bestMove = move
                     Alpha = v
+            if time.time() - started_time > allowed_time:
+                return None
         return bestMove
 
 
@@ -421,14 +432,14 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
         # init depth
         D = 1
         started = time.time()
-        move = self.play(board, D)
+        move = self.play(board, D, time_limit)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_move = self.play(board, D)
+            curr_move = self.play(board,next_itr_time,  D)
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
@@ -436,17 +447,20 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
             curr_time = time.time() - started
         return move
 
-    def play(self, board, D):
+    def play(self, board, allowed_time, D):
+        started_time = time.time()
         currMax = float('-inf')
         bestMove = None
         # loop over the children to find the max
         for move in Move:
             new_board, done, score = commands[move](board)
             if done:
-                v = self.helper_fun.RB_MINIMAX(new_board, CHANCE_PLAYER, D - 1)
+                v = self.helper_fun.RB_Expectimax(new_board, CHANCE_PLAYER, D - 1)
                 if currMax < v:
                     currMax = v
                     bestMove = move
+            if time.time() - started_time > allowed_time:
+                return None
         return bestMove
 
 
@@ -464,14 +478,14 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
         # init depth
         D = 1
         started = time.time()
-        indicate = self.play(board, D)
+        indicate = self.play(board, D, time_limit)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_indicate = self.play(board, D)
+            curr_indicate = self.play(board, D, next_itr_time)
             if curr_indicate is not None:
                 indicate = curr_indicate
             itr_time = time.time() - started_time
@@ -479,20 +493,29 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
             curr_time = time.time() - started
         return indicate
 
-    def play(self, board, D, value=2):
+    def play(self, board, D, allowed_time):
+        started_time = time.time()
         currMin = float('inf')
         bestIndicate = None
         # save the place of the empty cells
         cells = [(row_idx, col_idx) for row_idx, row in enumerate(board) for col_idx, item in enumerate(row) if
                  item == 0]
+        new_board = board.copy()
         # loop over the empty places
         for (i, j) in cells:
-            new_board = board.copy()
-            new_board[i][j] = value
-            v = self.helper_fun.RB_Expectimax(new_board, MAX_PLAYER, D - 1, value)
+
+            new_board[i][j] = 2
+            v1 = self.helper_fun.RB_Expectimax(new_board, MAX_PLAYER, D - 1)
+            new_board[i][j] = 4
+            v2 = self.helper_fun.RB_Expectimax(new_board, MAX_PLAYER, D - 1)
+            new_board[i][j] = 0
+            v = P2 * v1 + P4 * v2
             if currMin > v:
                 currMin = v
                 bestIndicate = (i, j)
+            curr_time = time.time() - started_time
+            if curr_time > allowed_time:
+                return None
         return bestIndicate
 
 
