@@ -156,7 +156,8 @@ class HELPER:
         if goal or D == 0:
             return self.heuristics(board, score)
         if agent == CHANCE_PLAYER:
-            return (self.RB_Expectimax(board, MIN_PLAYER, D - 1, 2) * P2) + (self.RB_Expectimax(board, MIN_PLAYER, D - 1, 4) * P4)
+            return (self.RB_Expectimax(board, MIN_PLAYER, D - 1, 2) * P2) + (
+                    self.RB_Expectimax(board, MIN_PLAYER, D - 1, 4) * P4)
         if agent == MAX_PLAYER:
             # init max
             currMax = float('-inf')
@@ -432,14 +433,14 @@ class ExpectimaxMovePlayer(AbstractMovePlayer):
         # init depth
         D = 1
         started = time.time()
-        move = self.play(board, D, time_limit)
+        move = self.play(board, time_limit, D)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_move = self.play(board,next_itr_time,  D)
+            curr_move = self.play(board, next_itr_time, D)
             if curr_move is not None:
                 move = curr_move
             itr_time = time.time() - started_time
@@ -478,14 +479,14 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
         # init depth
         D = 1
         started = time.time()
-        indicate = self.play(board, D, time_limit)
+        indicate = self.play(board, time_limit, D)
         itr_time = time.time() - started
         curr_time = itr_time
         next_itr_time = itr_time * MUL_TIME
         while next_itr_time + curr_time < time_limit:
             D += 1
             started_time = time.time()
-            curr_indicate = self.play(board, D, next_itr_time)
+            curr_indicate = self.play(board, next_itr_time, D)
             if curr_indicate is not None:
                 indicate = curr_indicate
             itr_time = time.time() - started_time
@@ -493,7 +494,7 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
             curr_time = time.time() - started
         return indicate
 
-    def play(self, board, D, allowed_time):
+    def play(self, board, allowed_time, D):
         started_time = time.time()
         currMin = float('inf')
         bestIndicate = None
@@ -513,8 +514,7 @@ class ExpectimaxIndexPlayer(AbstractIndexPlayer):
             if currMin > v:
                 currMin = v
                 bestIndicate = (i, j)
-            curr_time = time.time() - started_time
-            if curr_time > allowed_time:
+            if time.time() - started_time > allowed_time:
                 return None
         return bestIndicate
 
