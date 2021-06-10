@@ -531,40 +531,39 @@ class ContestMovePlayer(AbstractMovePlayer):
         self.helper_fun = HELPER()
 
     def get_move(self, board, time_limit) -> Move:
-        def get_move(self, board, time_limit) -> Move:
-            # init depth
-            D = 1
-            started = time.time()
-            move = self.play(board, D, time_limit)
-            itr_time = time.time() - started
-            curr_time = itr_time
-            next_itr_time = itr_time * MUL_TIME
-            while next_itr_time + curr_time < time_limit:
-                D += 1
-                started_time = time.time()
-                curr_move = self.play(board, D, next_itr_time)
-                if curr_move is not None:
-                    move = curr_move
-                itr_time = time.time() - started_time
-                next_itr_time = itr_time * MUL_TIME
-                curr_time = time.time() - started
-            return move
-
-        def play(self, board, D, allowed_time=None):
+        # init depth
+        D = 1
+        started = time.time()
+        move = self.play(board, D, time_limit)
+        itr_time = time.time() - started
+        curr_time = itr_time
+        next_itr_time = itr_time * MUL_TIME
+        while next_itr_time + curr_time < time_limit:
+            D += 1
             started_time = time.time()
-            currMax = float('-inf')
-            Alpha = float("-inf")
-            Beta = float("inf")
-            bestMove = None
-            # loop over the children to find the max
-            for move in Move:
-                new_board, done, score = commands[move](board)
-                if done:
-                    v = self.helper_fun.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta)
-                    if v > currMax:
-                        currMax = v
-                        bestMove = move
-                        Alpha = v
-                if time.time() - started_time > allowed_time:
-                    return None
-            return bestMove
+            curr_move = self.play(board, D, next_itr_time)
+            if curr_move is not None:
+                move = curr_move
+            itr_time = time.time() - started_time
+            next_itr_time = itr_time * MUL_TIME
+            curr_time = time.time() - started
+        return move
+
+    def play(self, board, D, allowed_time=None):
+        started_time = time.time()
+        currMax = float('-inf')
+        Alpha = float("-inf")
+        Beta = float("inf")
+        bestMove = None
+        # loop over the children to find the max
+        for move in Move:
+            new_board, done, score = commands[move](board)
+            if done:
+                v = self.helper_fun.AlphaBeta(new_board, MIN_PLAYER, D - 1, Alpha, Beta)
+                if v > currMax:
+                    currMax = v
+                    bestMove = move
+                    Alpha = v
+            if time.time() - started_time > allowed_time:
+                return None
+        return bestMove
